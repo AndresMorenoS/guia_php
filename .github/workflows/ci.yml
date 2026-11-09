@@ -1,0 +1,46 @@
+name: Verificación
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mysqli, mbstring
+
+      - name: Revisar sintaxis de todos los .php
+        run: |
+          find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+
+      - name: Importar sql/empresa.sql
+        run: mysql -h 127.0.0.1 -u root --default-character-set=utf8mb4 < sql/empresa.sql
+
+      - name: Verificar consultas y reglas de negocio
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASS: ""
+          DB_NAME: empresa
+        run: php tests/verificar.php
